@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder } = require('discord.js');
 const { loadConfig, updateConfig } = require('../utils/configManager');
+const { safeReply, safeError, safeDefer } = require('../utils/safeReply');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,7 +9,11 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    const deferred = await safeDefer(interaction, { ephemeral: true });
+    if (!deferred) {
+      console.error('Failed to defer setup-bot interaction');
+      return;
+    }
 
     try {
       const guild = interaction.guild;
@@ -32,9 +37,7 @@ module.exports = {
         .slice(0, 25);
 
       if (textChannels.length === 0) {
-        await interaction.editReply({
-          content: '❌ No text channels found in this server!'
-        });
+        await safeReply(interaction, '❌ No text channels found in this server!');
         return;
       }
 
@@ -82,11 +85,17 @@ module.exports = {
       const row3 = new ActionRowBuilder().addComponents(modRoleSelect);
       const row4 = new ActionRowBuilder().addComponents(verificationChannelSelect);
 
-      const setupMessage = await interaction.editReply({
-        embeds: [embed],
-        components: [row1, row2, row3, row4],
-        fetchReply: true
-      });
+      let setupMessage;
+      try {
+        setupMessage = await interaction.editReply({
+          embeds: [embed],
+          components: [row1, row2, row3, row4],
+          fetchReply: true
+        });
+      } catch (error) {
+        console.error('Failed to edit reply in setup:', error);
+        return;
+      }
 
       const config = loadConfig();
       const setupData = {
@@ -113,25 +122,37 @@ module.exports = {
           if (componentInteraction.customId === 'setup_intro_channel') {
             setupData.introChannelId = value;
             selections.add('intro');
-            await componentInteraction.reply({ content: `✅ Intro Channel set to <#${value}>`, ephemeral: true });
+            await safeReply(componentInteraction, {
+              content: `✅ Intro Channel set to <#${value}>`,
+              ephemeral: true
+            });
           } else if (componentInteraction.customId === 'setup_profile_channel') {
             setupData.profileChannelId = value;
             selections.add('profile');
-            await componentInteraction.reply({ content: `✅ Profile Channel set to <#${value}>`, ephemeral: true });
+            await safeReply(componentInteraction, {
+              content: `✅ Profile Channel set to <#${value}>`,
+              ephemeral: true
+            });
           } else if (componentInteraction.customId === 'setup_mod_role') {
             setupData.moderatorRoleId = value === 'skip' ? null : value;
             selections.add('mod');
             const msg = value === 'skip' 
               ? '⏭️ Moderator role skipped' 
               : `✅ Moderator Role set to <@&${value}>`;
-            await componentInteraction.reply({ content: msg, ephemeral: true });
+            await safeReply(componentInteraction, {
+              content: msg,
+              ephemeral: true
+            });
           } else if (componentInteraction.customId === 'setup_verification_channel') {
             setupData.verificationChannelId = value === 'skip' ? null : value;
             selections.add('verification');
             const msg = value === 'skip' 
               ? '⏭️ Verification channel skipped' 
               : `✅ Verification Channel set to <#${value}>`;
-            await componentInteraction.reply({ content: msg, ephemeral: true });
+            await safeReply(componentInteraction, {
+              content: msg,
+              ephemeral: true
+            });
           }
 
           if (setupData.introChannelId && setupData.profileChannelId) {
@@ -160,7 +181,7 @@ module.exports = {
                 .setFooter({ text: `Configured by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
                 .setTimestamp();
 
-              await interaction.followUp({
+              await safeReply(interaction, {
                 embeds: [successEmbed],
                 ephemeral: true,
                 components: []
@@ -173,16 +194,16 @@ module.exports = {
           }
         } catch (error) {
           if (error.code === 'INTERACTION_COLLECTOR_ERROR' || error.message.includes('time')) {
-            await interaction.followUp({ 
-              content: '⏱️ Setup wizard timed out. Please run `/setup-bot` again to configure.', 
-              ephemeral: true 
+            await safeReply(interaction, {
+              content: '⏱️ Setup wizard timed out. Please run `/setup-bot` again to configure.',
+              ephemeral: true
             });
             break;
           } else {
             console.error('❌ Error in setup wizard:', error);
-            await interaction.followUp({ 
-              content: '❌ An error occurred during setup. Please try again.', 
-              ephemeral: true 
+            await safeReply(interaction, {
+              content: '❌ An error occurred during setup. Please try again.',
+              ephemeral: true
             });
             break;
           }
@@ -191,9 +212,7 @@ module.exports = {
 
     } catch (error) {
       console.error('❌ Error in /setup-bot:', error);
-      await interaction.editReply({
-        content: '❌ An error occurred while setting up the bot. Please try again.'
-      });
+      await safeError(interaction, '❌ An error occurred while setting up the bot. Please try again.', error);
     }
   }
 };

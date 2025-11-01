@@ -25,8 +25,17 @@ const {
 } = require('./handlers/introInteractions');
 const { loadConfig, isSetupComplete } = require('./utils/configManager');
 const { startCleanupScheduler } = require('./utils/projectCleanup');
+const { safeReply, safeError } = require('./utils/safeReply');
 const fs = require('fs');
 const path = require('path');
+
+process.on('unhandledRejection', (error) => {
+  console.error('⚠️ Unhandled Promise Rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+});
 
 const client = new Client({
   intents: [
@@ -221,15 +230,7 @@ client.on('interactionCreate', async interaction => {
       }
     } catch (error) {
       console.error('❌ Error handling button interaction:', error);
-      const replyMethod = interaction.replied || interaction.deferred ? 'editReply' : 'reply';
-      try {
-        await interaction[replyMethod]({
-          content: '❌ There was an error processing your request!',
-          ephemeral: true
-        });
-      } catch (err) {
-        console.error('Could not send error message:', err);
-      }
+      await safeError(interaction, '❌ There was an error processing your request!', error);
     }
     return;
   }
@@ -245,14 +246,7 @@ client.on('interactionCreate', async interaction => {
       }
     } catch (error) {
       console.error('❌ Error handling modal submission:', error);
-      try {
-        await interaction.reply({
-          content: '❌ There was an error processing your submission!',
-          ephemeral: true
-        });
-      } catch (err) {
-        console.error('Could not send error message:', err);
-      }
+      await safeError(interaction, '❌ There was an error processing your submission!', error);
     }
     return;
   }
@@ -270,11 +264,7 @@ client.on('interactionCreate', async interaction => {
     await command.execute(interaction, PROFILE_CHANNEL_ID);
   } catch (error) {
     console.error('❌ Error executing command:', error);
-    const replyMethod = interaction.replied || interaction.deferred ? 'editReply' : 'reply';
-    await interaction[replyMethod]({
-      content: '❌ There was an error executing this command!',
-      ephemeral: true
-    });
+    await safeError(interaction, '❌ There was an error executing this command!', error);
   }
 });
 

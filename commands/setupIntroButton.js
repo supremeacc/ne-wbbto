@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { loadConfig, isSetupComplete } = require('../utils/configManager');
+const { safeReply, safeError, safeDefer } = require('../utils/safeReply');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,13 +14,15 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    const deferred = await safeDefer(interaction, { ephemeral: true });
+    if (!deferred) {
+      console.error('Failed to defer setup-intro-button interaction');
+      return;
+    }
 
     try {
       if (!isSetupComplete()) {
-        await interaction.editReply({
-          content: '❌ Bot is not configured yet! Please run `/setup-bot` first.'
-        });
+        await safeReply(interaction, '❌ Bot is not configured yet! Please run `/setup-bot` first.');
         return;
       }
 
@@ -28,9 +31,7 @@ module.exports = {
                            interaction.guild.channels.cache.get(config.introChannelId);
 
       if (!targetChannel) {
-        await interaction.editReply({
-          content: '❌ Could not find the target channel. Please specify a channel or run `/setup-bot` again.'
-        });
+        await safeReply(interaction, '❌ Could not find the target channel. Please specify a channel or run `/setup-bot` again.');
         return;
       }
 
@@ -72,17 +73,13 @@ module.exports = {
         components: [row]
       });
 
-      await interaction.editReply({
-        content: `✅ Introduction button posted successfully in ${targetChannel}!`
-      });
+      await safeReply(interaction, `✅ Introduction button posted successfully in ${targetChannel}!`);
 
       console.log(`✅ Intro button posted in #${targetChannel.name} by ${interaction.user.tag}`);
 
     } catch (error) {
       console.error('❌ Error in /setup-intro-button:', error);
-      await interaction.editReply({
-        content: '❌ An error occurred while posting the introduction button.'
-      });
+      await safeError(interaction, '❌ An error occurred while posting the introduction button.', error);
     }
   }
 };

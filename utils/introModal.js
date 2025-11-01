@@ -48,13 +48,7 @@ function createIntroModal(prefillData = {}) {
   const detailsInput = new TextInputBuilder()
     .setCustomId('intro_details')
     .setLabel('Skills, Experience Level & Goals')
-    .setPlaceholder(
-      'Tell us about:\n' +
-      '• Your skills (e.g., Python, TensorFlow)\n' +
-      '• Experience level (Beginner/Builder/Pro)\n' +
-      '• What you want to build or learn\n' +
-      '• Portfolio/GitHub links (optional)'
-    )
+    .setPlaceholder('Skills, level, goals, GitHub/portfolio (e.g., Python pro, building AI chatbot)')
     .setStyle(TextInputStyle.Paragraph)
     .setRequired(true)
     .setMinLength(50)

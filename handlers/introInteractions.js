@@ -3,6 +3,7 @@ const { createIntroModal } = require('../utils/introModal');
 const { processIntroWithAI, getExperienceColor, getExperienceEmoji } = require('../utils/geminiIntroProcessor');
 const { getUserProfile, saveUserProfile } = require('../utils/updateProfile');
 const { loadConfig } = require('../utils/configManager');
+const { safeReply, safeError, safeDefer } = require('../utils/safeReply');
 
 async function handleIntroButton(interaction) {
   try {
@@ -16,7 +17,11 @@ async function handleIntroButton(interaction) {
 }
 
 async function handleIntroModal(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  const deferred = await safeDefer(interaction, { ephemeral: true });
+  if (!deferred) {
+    console.error('Failed to defer intro modal interaction');
+    return;
+  }
 
   try {
     const name = interaction.fields.getTextInputValue('intro_name');
@@ -153,16 +158,16 @@ async function handleIntroModal(interaction) {
 
   } catch (error) {
     console.error('❌ Error processing intro modal:', error);
-    const replyMethod = interaction.replied || interaction.deferred ? 'editReply' : 'reply';
-    await interaction[replyMethod]({
-      content: '⚠️ Something went wrong while processing your introduction. Please try again or contact a moderator.',
-      ephemeral: true
-    });
+    await safeError(interaction, '⚠️ Something went wrong while processing your introduction. Please try again or contact a moderator.', error);
   }
 }
 
 async function handleEditProfileModal(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  const deferred = await safeDefer(interaction, { ephemeral: true });
+  if (!deferred) {
+    console.error('Failed to defer edit profile modal interaction');
+    return;
+  }
 
   try {
     const name = interaction.fields.getTextInputValue('intro_name');
@@ -277,11 +282,7 @@ async function handleEditProfileModal(interaction) {
 
   } catch (error) {
     console.error('❌ Error updating profile:', error);
-    const replyMethod = interaction.replied || interaction.deferred ? 'editReply' : 'reply';
-    await interaction[replyMethod]({
-      content: '⚠️ Something went wrong while updating your profile. Please try again.',
-      ephemeral: true
-    });
+    await safeError(interaction, '⚠️ Something went wrong while updating your profile. Please try again.', error);
   }
 }
 
